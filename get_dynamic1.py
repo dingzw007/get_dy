@@ -5,7 +5,6 @@ import math as mh
 import cmath as ch
 from numpy import linalg as LA
 import matplotlib.pyplot as plt
-from scipy.linalg import eigh
 #information about the unit cell this will be modified later to read all the information from POSCAR
 n_atom=2
 n_mass=12
@@ -36,14 +35,12 @@ lines1=f1.readlines()
 a1=np.fromstring(lines1[2],sep=' ')*AA
 a2=np.fromstring(lines1[3],sep=' ')*AA
 a3=np.fromstring(lines1[4],sep=' ')*AA
-#print(a1)
-#print(a2)
+
 V=np.dot(np.cross(a1,a2),a3)
 # calculate the unit vector in reciprocal space
 b1=2*pi*np.cross(a2,a3)/V
 b2=2*pi*np.cross(a3,a1)/V
-#print(b1)
-#print(b2)
+
 
 # calculate and prepare the FORCE_CONSTANTS   (!!worry about the unit latter)
 Nc=N_atom*3
@@ -54,14 +51,14 @@ lines2=f2.readlines()
 for i in range(N_atom):
     for j in range(N_atom):
         nl=4*(i*N_atom+j)+2
-        FC[j*3:(j+1)*3,i*3:(i+1)*3]=np.fromstring(lines2[nl]+lines2[nl+1]+lines2[nl+2],sep=' ').reshape(3,3)
+        FC[i*3:(i+1)*3,j*3:(j+1)*3]=np.fromstring(lines2[nl]+lines2[nl+1]+lines2[nl+2],sep=' ').reshape(3,3)
 
 #print(FC-FC.T)
 #print(FC.shape)
 # output the force constant to file to check
 #f=open('FC.dat','w+')
 #f.writelines(FC)
-#np.savetxt('kapp.dat',FC[:9,:9],fmt='%.5e', delimiter = '\t')
+np.savetxt('kapp.dat',FC[:9,:9],fmt='%.5e', delimiter = '\t')
 
 ##constructure a matrix
 
@@ -71,8 +68,7 @@ a1=np.fromstring(lines3[2],sep=' ')*AA
 a2=np.fromstring(lines3[3],sep=' ')*AA
 a3=np.fromstring(lines3[4],sep=' ')*AA
 aa=np.concatenate((a1,a2,a3),axis=0).reshape(3,3).T
-#print(a1)
-#print(a2)
+
 #print(aa)
 
 ss=(N_atom,3)
@@ -93,40 +89,32 @@ nn=N_atom//2
 #Specify the number of q qpoints
 
 #print(nn)
-Nq=51
+Nq=2
 qq=0.5/(Nq-1)
 ss=(Nq,n_atom*3)
 ww=np.zeros(ss)
 qs=np.arange(Nq)*qq+0.0001
 for j in range(Nq):
-    q=qs[j]
+    q=0.2
     ss=(n_atom*3,n_atom*3)
     D=np.zeros(ss,dtype=complex)
-    for ii in range(nx):
-        for k in range(ny):
-            i=ii*5+k
-            if k>3:
-                kk=k-5
-            else:
-                kk=k
-            D[:3,:3]=D[:3,:3]+FC[:3,i*3:(i+1)*3]*ch.exp(0.2*1j*q*b2@(kk*a2))/mass_c*eV/(AA*AA)*1E-24
-            D[0:3,3:6]=D[0:3,3:6]+FC[:3,(i+nn)*3:(i+1+nn)*3].T*ch.exp(0.2*1j*q*b2@(kk*a2))/mass_c*eV/(AA*AA)*1E-24
-            D[3:6,0:3]=D[3:6,0:3]+FC[3*nn:3*nn+3,i*3:(i+1)*3].T*ch.exp(0.2*1j*q*b2@(kk*a2))/mass_c*eV/(AA*AA)*1E-24
-            D[3:6,3:6]=D[3:6,3:6]+FC[3*nn:3*nn+3,(i+nn)*3:(i+1+nn)*3]*ch.exp(0.2*1j*q*b2@(kk*a2))/mass_c*eV/(AA*AA)*1E-24
-    #print(D)
+    for i in range(nn):
+        D[:3,:3]=D[:3,:3]+FC[:3,i*3:(i+1)*3]*ch.exp(1j*q*b2@(xxs[i,:]-xxs[0,:]))/mass_c*eV/(AA*AA)*1E-24
+        D[:3,3:6]=D[:3,3:6]+FC[:3,(i+nn)*3:(i+1+nn)*3]*ch.exp(1j*q*b2@(xxs[i+nn,:]-xxs[0,:]))/mass_c*eV/(AA*AA)*1E-24
+        D[3:6,:3]=D[3:6,:3]+FC[3*nn:3*nn+3,i*3:(i+1)*3]*ch.exp(1j*q*b2@(xxs[i,:]-xxs[nn,:]))/mass_c*eV/(AA*AA)*1E-24
+        D[3:6,3:6]=D[3:6,3:6]+FC[3*nn:3*nn+3,(i+nn)*3:(i+1+nn)*3]*ch.exp(1j*q*b2@(xxs[i+nn,:]-xxs[nn,:]))/mass_c*eV/(AA*AA)*1E-24
 
-    w,v=eigh(D)
-    w0=0.0*np.amax(np.abs(w))
+    print(D)
+    w,v=LA.eig(D)
+    w0=0.1*np.amax(np.abs(w))*2
 
-    w,v=eigh(D+w0*np.identity(6))
+    w,v=LA.eig(D+w0*np.identity(6))
+    w=np.sort(np.sqrt(w.real-w0))/(2*mh.pi)
     print(w)
-    w=np.sort(np.sqrt(np.abs(w)-w0))/(2*mh.pi)
-    #print(w)
     ww[j,:]=w
     #print(D)
 #print(np.sort(np.sqrt(w.real-w0))/(2*mh.pi))
 #print(v)
 #print(qs)
-np.savetxt('ww.dat',ww,fmt='%.5e', delimiter = '\t')
-plt.plot(qs,ww)
-plt.show()
+#plt.plot(qs,ww)
+#plt.show()
