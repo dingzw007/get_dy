@@ -6,6 +6,8 @@ import cmath as ch
 from numpy import linalg as LA
 import matplotlib.pyplot as plt
 from scipy.linalg import eigh
+import scipy.io
+
 #information about the unit cell this will be modified later to read all the information from POSCAR
 n_atom=2
 n_mass=12
@@ -56,6 +58,12 @@ for i in range(N_atom):
         nl=4*(i*N_atom+j)+2
         FC[j*3:(j+1)*3,i*3:(i+1)*3]=np.fromstring(lines2[nl]+lines2[nl+1]+lines2[nl+2],sep=' ').reshape(3,3)
 
+#Apply the acoustic sum rule
+
+for i in range(Nc):
+    #print(np.sum(FC[i,:]))
+    FC[i,i]=FC[i,i]-np.sum(FC[i,:])
+    #print(np.sum(FC[i,:]))
 #print(FC-FC.T)
 #print(FC.shape)
 # output the force constant to file to check
@@ -97,7 +105,8 @@ Nq=51
 qq=0.5/(Nq-1)
 ss=(Nq,n_atom*3)
 ww=np.zeros(ss)
-qs=np.arange(Nq)*qq+0.0001
+qs=np.arange(Nq)*qq+0.001
+ff=pow(1.0/mass_c*eV/(AA*AA)*1E-24,0.5)
 for j in range(Nq):
     q=qs[j]
     ss=(n_atom*3,n_atom*3)
@@ -109,20 +118,27 @@ for j in range(Nq):
                 kk=k-5
             else:
                 kk=k
-            D[:3,:3]=D[:3,:3]+FC[:3,i*3:(i+1)*3]*ch.exp(0.2*1j*q*b2@(kk*a2))/mass_c*eV/(AA*AA)*1E-24
-            D[0:3,3:6]=D[0:3,3:6]+FC[:3,(i+nn)*3:(i+1+nn)*3].T*ch.exp(0.2*1j*q*b2@(kk*a2))/mass_c*eV/(AA*AA)*1E-24
-            D[3:6,0:3]=D[3:6,0:3]+FC[3*nn:3*nn+3,i*3:(i+1)*3].T*ch.exp(0.2*1j*q*b2@(kk*a2))/mass_c*eV/(AA*AA)*1E-24
-            D[3:6,3:6]=D[3:6,3:6]+FC[3*nn:3*nn+3,(i+nn)*3:(i+1+nn)*3]*ch.exp(0.2*1j*q*b2@(kk*a2))/mass_c*eV/(AA*AA)*1E-24
+            D[:3,:3]=D[:3,:3]+FC[:3,i*3:(i+1)*3]*ch.exp(2*pi*1j*q*kk)
+            D[0:3,3:6]=D[0:3,3:6]+FC[:3,(i+nn)*3:(i+1+nn)*3]*ch.exp(2*pi*1j*q*kk)
+            D[3:6,0:3]=D[3:6,0:3]+FC[3*nn:3*nn+3,i*3:(i+1)*3]*ch.exp(2*pi*1j*q*kk)
+            D[3:6,3:6]=D[3:6,3:6]+FC[3*nn:3*nn+3,(i+nn)*3:(i+1+nn)*3]*ch.exp(2*pi*1j*q*kk)
+    w=LA.eigvalsh(D)
     #print(D)
-
-    w,v=eigh(D)
+    #print(w)
+    #D=0.5*(D+D.conj().T)
+    #print(D-D.conj().T)
+    #np.savetxt('D.dat',D,fmt='%.5e', delimiter = '\t')
+    #scipy.io.savemat('D.mat',dict(D))
+    #np.save('D.npy',dict('D',D))
+    #w=LA.eigvalsh(D)
+    #print(w)
     w0=0.0*np.amax(np.abs(w))
 
-    w,v=eigh(D+w0*np.identity(6))
-    print(w)
-    w=np.sort(np.sqrt(np.abs(w)-w0))/(2*mh.pi)
+    w=LA.eigvalsh(D+w0*np.identity(6)).real
     #print(w)
-    ww[j,:]=w
+    w=np.sort(np.sqrt(w.real-w0))/(2*mh.pi)
+    #print(w)
+    ww[j,:]=w*ff
     #print(D)
 #print(np.sort(np.sqrt(w.real-w0))/(2*mh.pi))
 #print(v)
